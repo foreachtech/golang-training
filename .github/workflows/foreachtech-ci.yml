@@ -1,0 +1,51 @@
+name: Lint4
+
+on: [push]
+
+jobs:
+  lint4:
+    name: Lint4
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.21
+        uses: actions/setup-go@v2
+        with:
+          go-version: "1.21"
+        id: go
+
+      
+      - uses: actions/checkout@v4
+
+      - name: Add SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          
+      - name: Set GOPRIVATE
+        run: |
+          GO111MODULE=on go env -w GOPRIVATE='github.com/moneyforwardvietnam/*,github.com/moneyforward/*'
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2 # v1 is for versioning this checkout action
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install additional commands
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.0
+
+      - name: Install dependencies
+        if: steps.cache-dependencies.outputs.cache-hit != 'true'
+        run: |
+          make mod
+
+      - name: Golint
+        run: |
+          make lint
